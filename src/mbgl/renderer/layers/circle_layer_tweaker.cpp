@@ -9,7 +9,6 @@
 #include <mbgl/shaders/shader_source.hpp>
 #include <mbgl/style/layers/circle_layer_properties.hpp>
 #include <mbgl/util/convert.hpp>
-#include <mbgl/util/string_indexer.hpp>
 
 #if MLN_RENDER_BACKEND_METAL
 #include <mbgl/shaders/mtl/circle.hpp>
@@ -21,10 +20,6 @@ namespace mbgl {
 
 using namespace style;
 using namespace shaders;
-
-static const StringIdentity idCircleDrawableUBOName = stringIndexer().get("CircleDrawableUBO");
-static const StringIdentity idCirclePaintParamsUBOName = stringIndexer().get("CirclePaintParamsUBO");
-static const StringIdentity idCircleEvaluatedPropsUBOName = stringIndexer().get("CircleEvaluatedPropsUBO");
 
 void CircleLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParameters& parameters) {
     auto& context = parameters.context;
@@ -45,19 +40,14 @@ void CircleLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamete
         /* .padding = */ 0,
         0,
         0};
-
-    if (!paintParamsUniformBuffer) {
-        paintParamsUniformBuffer = context.createUniformBuffer(&paintParamsUBO, sizeof(paintParamsUBO));
-    } else {
-        paintParamsUniformBuffer->update(&paintParamsUBO, sizeof(CirclePaintParamsUBO));
-    }
+    context.emplaceOrUpdateUniformBuffer(paintParamsUniformBuffer, &paintParamsUBO);
 
     const auto zoom = parameters.state.getZoom();
     const bool pitchWithMap = evaluated.get<CirclePitchAlignment>() == AlignmentType::Map;
     const bool scaleWithMap = evaluated.get<CirclePitchScale>() == CirclePitchScaleType::Map;
 
     // Updated only with evaluated properties
-    if (!evaluatedPropsUniformBuffer) {
+    if (!evaluatedPropsUniformBuffer || propertiesUpdated) {
         const CircleEvaluatedPropsUBO evaluatedPropsUBO = {
             /* .color = */ constOrDefault<CircleColor>(evaluated),
             /* .stroke_color = */ constOrDefault<CircleStrokeColor>(evaluated),
@@ -69,8 +59,9 @@ void CircleLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamete
             /* .scale_with_map = */ scaleWithMap,
             /* .pitch_with_map = */ pitchWithMap,
             /* .padding = */ 0};
-        evaluatedPropsUniformBuffer = context.createUniformBuffer(&evaluatedPropsUBO, sizeof(evaluatedPropsUBO));
+        context.emplaceOrUpdateUniformBuffer(evaluatedPropsUniformBuffer, &evaluatedPropsUBO);
     }
+    propertiesUpdated = false;
 
     visitLayerGroupDrawables(layerGroup, [&](gfx::Drawable& drawable) {
         assert(drawable.getTileID() || !"Circles only render with tiles");
@@ -80,14 +71,15 @@ void CircleLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamete
         const UnwrappedTileID tileID = drawable.getTileID()->toUnwrapped();
 
         auto& uniforms = drawable.mutableUniformBuffers();
-        uniforms.addOrReplace(idCirclePaintParamsUBOName, paintParamsUniformBuffer);
-        uniforms.addOrReplace(idCircleEvaluatedPropsUBOName, evaluatedPropsUniformBuffer);
+        uniforms.set(idCirclePaintParamsUBO, paintParamsUniformBuffer);
+        uniforms.set(idCircleEvaluatedPropsUBO, evaluatedPropsUniformBuffer);
 
         const auto& translation = evaluated.get<CircleTranslate>();
         const auto anchor = evaluated.get<CircleTranslateAnchor>();
         constexpr bool inViewportPixelUnits = false; // from RenderTile::translatedMatrix
         constexpr bool nearClipped = false;
-        const auto matrix = getTileMatrix(tileID, parameters, translation, anchor, nearClipped, inViewportPixelUnits);
+        const auto matrix = getTileMatrix(
+            tileID, parameters, translation, anchor, nearClipped, inViewportPixelUnits, drawable);
 
         const auto pixelsToTileUnits = tileID.pixelsToTileUnits(1.0f, static_cast<float>(zoom));
         const auto extrudeScale = pitchWithMap ? std::array<float, 2>{pixelsToTileUnits, pixelsToTileUnits}
@@ -98,7 +90,7 @@ void CircleLayerTweaker::execute(LayerGroupBase& layerGroup, const PaintParamete
                                                /* .extrude_scale = */ extrudeScale,
                                                /* .padding = */ 0};
 
-        uniforms.createOrUpdate(idCircleDrawableUBOName, &drawableUBO, context);
+        uniforms.createOrUpdate(idCircleDrawableUBO, &drawableUBO, context);
     });
 }
 

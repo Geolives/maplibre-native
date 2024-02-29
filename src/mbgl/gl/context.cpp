@@ -15,6 +15,7 @@
 #include <mbgl/util/traits.hpp>
 #include <mbgl/util/std.hpp>
 #include <mbgl/util/logging.hpp>
+#include <mbgl/util/thread_pool.hpp>
 
 #if MLN_DRAWABLE_RENDERER
 #include <mbgl/gl/drawable_gl.hpp>
@@ -81,6 +82,8 @@ Context::Context(RendererBackend& backend_)
 
 Context::~Context() noexcept {
     if (cleanupOnDestruction) {
+        Scheduler::GetBackground()->runRenderJobs();
+
         reset();
 #if !defined(NDEBUG)
         Log::Debug(Event::General, "Rendering Stats:\n" + stats.toString("\n"));
@@ -90,6 +93,8 @@ Context::~Context() noexcept {
 }
 
 void Context::beginFrame() {
+    Scheduler::GetBackground()->runRenderJobs();
+
 #if MLN_DRAWABLE_RENDERER
     frameInFlightFence = std::make_shared<gl::Fence>();
 
@@ -490,7 +495,9 @@ void Context::setDirtyState() {
     stencilMask.setDirty();
     stencilTest.setDirty();
     stencilOp.setDirty();
+#if MLN_RENDER_BACKEND_OPENGL
     depthRange.setDirty();
+#endif
     depthMask.setDirty();
     depthTest.setDirty();
     depthFunc.setDirty();
@@ -615,12 +622,16 @@ void Context::setDepthMode(const gfx::DepthMode& depth) {
         // https://github.com/mapbox/mapbox-gl-native/issues/9164
         depthFunc = depth.func;
         depthMask = depth.mask;
+#if MLN_RENDER_BACKEND_OPENGL
         depthRange = depth.range;
+#endif
     } else {
         depthTest = true;
         depthFunc = depth.func;
         depthMask = depth.mask;
+#if MLN_RENDER_BACKEND_OPENGL
         depthRange = depth.range;
+#endif
     }
 }
 

@@ -29,7 +29,6 @@ class RenderTree;
 class UnwrappedTileID;
 
 using mat4 = std::array<double, 16>;
-using StringIdentity = std::size_t;
 
 /**
     Base class for layer tweakers, which manipulate layer group per frame
@@ -57,6 +56,7 @@ public:
                               style::TranslateAnchorType,
                               bool nearClipped,
                               bool inViewportPixelUnits,
+                              const gfx::Drawable& drawable,
                               bool aligned = false);
 
 protected:
