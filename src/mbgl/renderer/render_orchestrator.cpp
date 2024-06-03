@@ -142,7 +142,7 @@ RenderOrchestrator::~RenderOrchestrator() {
     // Wait for any deferred cleanup tasks to complete before releasing and potentially
     // destroying the scheduler.  Those cleanup tasks must not hold the final reference
     // to the scheduler because it cannot be destroyed from one of its own pool threads.
-    constexpr auto deferredCleanupTimeout = Milliseconds{1000};
+    constexpr auto deferredCleanupTimeout = Milliseconds{10000};
     [[maybe_unused]] const auto remaining = threadPool->waitForEmpty(deferredCleanupTimeout);
     assert(remaining == 0);
 }
@@ -175,12 +175,11 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
                                                                     : TransitionOptions();
 
     const TransitionParameters transitionParameters{updateParameters->timePoint, transitionOptions};
+    const auto transitionDuration = transitionOptions.duration.value_or(
+        isMapModeContinuous ? util::DEFAULT_TRANSITION_DURATION : Duration::zero());
 
-    const PropertyEvaluationParameters evaluationParameters{
-        zoomHistory,
-        updateParameters->timePoint,
-        transitionOptions.duration.value_or(isMapModeContinuous ? util::DEFAULT_TRANSITION_DURATION
-                                                                : Duration::zero())};
+    PropertyEvaluationParameters evaluationParameters{zoomHistory, updateParameters->timePoint, transitionDuration};
+    evaluationParameters.zoomChanged = zoomChanged;
 
     const TileParameters tileParameters{updateParameters->pixelRatio,
                                         updateParameters->debugOptions,
@@ -300,8 +299,10 @@ std::unique_ptr<RenderTree> RenderOrchestrator::createRenderTree(
     for (RenderLayer& layer : orderedLayers) {
         const std::string& id = layer.getID();
         const bool layerAddedOrChanged = layerDiff.added.count(id) || layerDiff.changed.count(id);
-        if (layerAddedOrChanged || zoomChanged || layer.hasTransition() || layer.hasCrossfade()) {
-            auto previousMask = layer.evaluatedProperties->constantsMask();
+        evaluationParameters.layerChanged = layerAddedOrChanged;
+        evaluationParameters.hasCrossfade = layer.hasCrossfade();
+        if (layerAddedOrChanged || zoomChanged || evaluationParameters.hasCrossfade || layer.hasTransition()) {
+            const auto previousMask = layer.evaluatedProperties->constantsMask();
             layer.evaluate(evaluationParameters);
             if (previousMask != layer.evaluatedProperties->constantsMask()) {
                 constantsMaskChanged.insert(id);
@@ -901,8 +902,12 @@ void RenderOrchestrator::updateLayers(gfx::ShaderRegistry& shaders,
         transitionOptions.duration.value_or(defDuration),
     };
 
+    const auto& items = renderTree.getLayerRenderItemMap();
+
     std::vector<std::unique_ptr<ChangeRequest>> changes;
-    for (const auto& item : renderTree.getLayerRenderItemMap()) {
+    changes.reserve(items.size() * 3);
+
+    for (const auto& item : items) {
         auto& renderLayer = item.layer.get();
         renderLayer.update(shaders, context, state, updateParameters, renderTree, changes);
     }

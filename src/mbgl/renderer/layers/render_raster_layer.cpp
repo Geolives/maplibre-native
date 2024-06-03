@@ -39,7 +39,9 @@ inline const RasterLayer::Impl& impl_cast(const Immutable<style::Layer::Impl>& i
 
 RenderRasterLayer::RenderRasterLayer(Immutable<style::RasterLayer::Impl> _impl)
     : RenderLayer(makeMutable<RasterLayerProperties>(std::move(_impl))),
-      unevaluated(impl_cast(baseImpl).paint.untransitioned()) {}
+      unevaluated(impl_cast(baseImpl).paint.untransitioned()) {
+    styleDependencies = unevaluated.getDependencies();
+}
 
 RenderRasterLayer::~RenderRasterLayer() = default;
 
@@ -48,8 +50,11 @@ void RenderRasterLayer::transition(const TransitionParameters& parameters) {
 }
 
 void RenderRasterLayer::evaluate(const PropertyEvaluationParameters& parameters) {
-    auto properties = makeMutable<RasterLayerProperties>(staticImmutableCast<RasterLayer::Impl>(baseImpl),
-                                                         unevaluated.evaluate(parameters));
+    const auto previousProperties = staticImmutableCast<RasterLayerProperties>(evaluatedProperties);
+    auto properties = makeMutable<RasterLayerProperties>(
+        staticImmutableCast<RasterLayer::Impl>(baseImpl),
+        unevaluated.evaluate(parameters, previousProperties->evaluated));
+
     passes = properties->evaluated.get<style::RasterOpacity>() > 0 ? RenderPass::Translucent : RenderPass::None;
     properties->renderPasses = mbgl::underlying_type(passes);
     evaluatedProperties = std::move(properties);

@@ -51,6 +51,7 @@ add_library(
     ${PROJECT_SOURCE_DIR}/test/style/conversion/property_value.test.cpp
     ${PROJECT_SOURCE_DIR}/test/style/conversion/stringify.test.cpp
     ${PROJECT_SOURCE_DIR}/test/style/conversion/tileset.test.cpp
+    ${PROJECT_SOURCE_DIR}/test/style/expression/dependency.test.cpp
     ${PROJECT_SOURCE_DIR}/test/style/expression/expression.test.cpp
     ${PROJECT_SOURCE_DIR}/test/style/expression/util.test.cpp
     ${PROJECT_SOURCE_DIR}/test/style/filter.test.cpp
@@ -229,7 +230,7 @@ if(WIN32)
     )
 endif()
 
-set_property(TARGET mbgl-test PROPERTY FOLDER Core)
+set_property(TARGET mbgl-test PROPERTY FOLDER MapLibre)
 
 if (MLN_WITH_CLANG_TIDY)
     set_target_properties(mbgl-test PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_COMMAND}")

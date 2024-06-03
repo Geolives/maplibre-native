@@ -42,7 +42,9 @@ inline const BackgroundLayer::Impl& impl_cast(const Immutable<style::Layer::Impl
 
 RenderBackgroundLayer::RenderBackgroundLayer(Immutable<style::BackgroundLayer::Impl> _impl)
     : RenderLayer(makeMutable<BackgroundLayerProperties>(std::move(_impl))),
-      unevaluated(impl_cast(baseImpl).paint.untransitioned()) {}
+      unevaluated(impl_cast(baseImpl).paint.untransitioned()) {
+    styleDependencies = unevaluated.getDependencies();
+}
 
 RenderBackgroundLayer::~RenderBackgroundLayer() = default;
 
@@ -51,7 +53,8 @@ void RenderBackgroundLayer::transition(const TransitionParameters& parameters) {
 }
 
 void RenderBackgroundLayer::evaluate(const PropertyEvaluationParameters& parameters) {
-    auto evaluated = unevaluated.evaluate(parameters);
+    const auto previousProperties = staticImmutableCast<BackgroundLayerProperties>(evaluatedProperties);
+    auto evaluated = unevaluated.evaluate(parameters, previousProperties->evaluated);
     auto properties = makeMutable<BackgroundLayerProperties>(
         staticImmutableCast<BackgroundLayer::Impl>(baseImpl), parameters.getCrossfadeParameters(), evaluated);
 

@@ -43,7 +43,9 @@ inline const HillshadeLayer::Impl& impl_cast(const Immutable<style::Layer::Impl>
 
 RenderHillshadeLayer::RenderHillshadeLayer(Immutable<style::HillshadeLayer::Impl> _impl)
     : RenderLayer(makeMutable<HillshadeLayerProperties>(std::move(_impl))),
-      unevaluated(impl_cast(baseImpl).paint.untransitioned()) {}
+      unevaluated(impl_cast(baseImpl).paint.untransitioned()) {
+    styleDependencies = unevaluated.getDependencies();
+}
 
 RenderHillshadeLayer::~RenderHillshadeLayer() = default;
 
@@ -75,8 +77,11 @@ void RenderHillshadeLayer::layerChanged(const TransitionParameters& parameters,
 #endif
 
 void RenderHillshadeLayer::evaluate(const PropertyEvaluationParameters& parameters) {
-    auto properties = makeMutable<HillshadeLayerProperties>(staticImmutableCast<HillshadeLayer::Impl>(baseImpl),
-                                                            unevaluated.evaluate(parameters));
+    const auto previousProperties = staticImmutableCast<HillshadeLayerProperties>(evaluatedProperties);
+    auto properties = makeMutable<HillshadeLayerProperties>(
+        staticImmutableCast<HillshadeLayer::Impl>(baseImpl),
+        unevaluated.evaluate(parameters, previousProperties->evaluated));
+
     passes = (properties->evaluated.get<style::HillshadeExaggeration>() > 0)
                  ? (RenderPass::Translucent | RenderPass::Pass3D)
                  : RenderPass::None;

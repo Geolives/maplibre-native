@@ -295,7 +295,7 @@ static NSString * const MLNInvisibleStyleMarkerSymbolName = @"invisible_marker";
 
 /// Prefix that denotes a sprite installed by MLNMapView, to avoid collisions
 /// with style-defined sprites.
-NSString * const MLNAnnotationSpritePrefix = @"com.mapbox.sprites.";
+NSString * const MLNAnnotationSpritePrefix = @"org.maplibre.sprites.";
 
 /// Slop area around the hit testing point, allowing for imprecise annotation selection.
 const CGFloat MLNAnnotationImagePaddingForHitTest = 5;
@@ -859,6 +859,8 @@ public:
     _pendingLatitude = NAN;
     _pendingLongitude = NAN;
     _targetCoordinate = kCLLocationCoordinate2DInvalid;
+    
+    _shouldRequestAuthorizationToUseLocationServices = YES;
 }
 
 - (mbgl::Size)size
@@ -2862,7 +2864,7 @@ public:
         }
     }
 
-    NSString *actionSheetTitle = NSLocalizedStringWithDefaultValue(@"SDK_NAME", nil, nil, @"Mapbox Maps SDK for iOS", @"Action sheet title");
+    NSString *actionSheetTitle = NSLocalizedStringWithDefaultValue(@"SDK_NAME", nil, nil, @"MapLibre Native for iOS", @"Action sheet title");
     UIAlertController *attributionController = [UIAlertController alertControllerWithTitle:actionSheetTitle
                                                                                    message:nil
                                                                             preferredStyle:UIAlertControllerStyleActionSheet];
@@ -5812,7 +5814,7 @@ static void *windowScreenContext = &windowScreenContext;
 
     if (shouldEnableLocationServices)
     {
-        if (self.locationManager.authorizationStatus == kCLAuthorizationStatusNotDetermined) {
+        if (self.shouldRequestAuthorizationToUseLocationServices && self.locationManager.authorizationStatus == kCLAuthorizationStatusNotDetermined) {
             BOOL hasWhenInUseUsageDescription = !![[NSBundle mainBundle] objectForInfoDictionaryKey:@"NSLocationWhenInUseUsageDescription"];
 
             if (@available(iOS 11.0, *)) {
@@ -6975,6 +6977,7 @@ static void *windowScreenContext = &windowScreenContext;
         if (annotationView)
         {
             CLLocationCoordinate2D coordinate = annotation.coordinate;
+
             // Every so often (1 out of 1000 frames?) the mbgl query mechanism fails. This logic spot checks the
             // offscreenAnnotations values -- if they are actually still on screen then the view center is
             // moved and the enqueue operation is avoided. This allows us to keep the performance benefit of
@@ -6994,7 +6997,7 @@ static void *windowScreenContext = &windowScreenContext;
                 CGPoint adjustedCenter = annotationView.center;
                 adjustedCenter.x = -CGRectGetWidth(self.frame) * 10.0;
                 annotationView.center = adjustedCenter;
-
+                
                 [self enqueueAnnotationViewForAnnotationContext:annotationContext];
             }
         }
