@@ -82,6 +82,14 @@ void AndroidRendererFrontend::update(std::shared_ptr<UpdateParameters> params) {
     updateAsyncTask->send();
 }
 
+const TaggedScheduler& AndroidRendererFrontend::getThreadPool() const {
+    return mapRenderer.getThreadPool();
+}
+
+void AndroidRendererFrontend::setTileCacheEnabled(bool enabled) {
+    mapRenderer.actor().invoke(&Renderer::setTileCacheEnabled, enabled);
+}
+
 void AndroidRendererFrontend::reduceMemoryUse() {
     mapRenderer.actor().invoke(&Renderer::reduceMemoryUse);
 }
